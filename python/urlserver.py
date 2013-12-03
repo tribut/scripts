@@ -200,8 +200,8 @@ def base64_decode(s):
         # python 2.x
         return base64.b64decode(s)
 
-def urlserver_get_hostname(full=True):
-    """Return hostname with port number if != default port for the protocol."""
+def urlserver_get_base_url():
+    """Return url with port number if != default port for the protocol, including prefix path."""
     global urlserver_settings
 
     scheme = urlserver_settings['http_scheme_display']
@@ -226,14 +226,11 @@ def urlserver_get_hostname(full=True):
     if urlserver_settings['http_url_prefix']:
         prefix = '%s/' % urlserver_settings['http_url_prefix']
 
-    if full:
-        return '%s://%s%s/%s' % (scheme, hostname, prefixed_port, prefix)
-    else:
-        return '%s' % prefix
+    return '%s://%s%s/%s' % (scheme, hostname, prefixed_port, prefix)
 
 def urlserver_short_url(number, full=True):
     """Return short URL with number."""
-    return '%s%s' % (urlserver_get_hostname(full), base62_encode(number))
+    return '%s%s' % (urlserver_get_base_url() if full else '', base62_encode(number))
 
 def urlserver_server_reply(conn, code, extra_header, message, mimetype='text/html'):
     """Send a HTTP reply to client."""
@@ -297,15 +294,12 @@ def urlserver_server_reply_list(conn, sort='-time'):
     if sort.startswith('-'):
         urls.reverse()
     sortkey = { '-': ('', '&uarr;'), '+': ('-', '&darr;') }
-    prefix = ''
-    if urlserver_settings['http_url_prefix']:
-        prefix = '%s/' % urlserver_settings['http_url_prefix']
     content += '  <tr>'
     for column, defaultsort in (('time', '-'), ('nick', ''), ('buffer', '')):
         if sort[1:] == column:
-            content += '<th class="sortable sorted_by %s_header"><a href="%ssort=%s%s">%s</a> %s</th>' % (column, prefix, sortkey[sort[0]][0], column, column.capitalize(), sortkey[sort[0]][1])
+            content += '<th class="sortable sorted_by %s_header"><a href="sort=%s%s">%s</a> %s</th>' % (column, sortkey[sort[0]][0], column, column.capitalize(), sortkey[sort[0]][1])
         else:
-            content += '<th class="sortable %s_header"><a class="sort_link" href="%ssort=%s%s">%s</a></th>' % (column, prefix, defaultsort, column, column.capitalize())
+            content += '<th class="sortable %s_header"><a class="sort_link" href="sort=%s%s">%s</a></th>' % (column, defaultsort, column, column.capitalize())
     content += '<th class="unsortable message_header">URLs</th>'
     content += '</tr>\n'
     for key, item in urls:
@@ -359,7 +353,7 @@ def urlserver_server_reply_list(conn, sort='-time'):
         '<link rel="icon" type="image/png" href="favicon.png" />\n' \
         '</head>\n' \
         '<body>\n%s\n</body>\n' \
-        '</html>' % (urlserver_settings['http_title'], css, urlserver_get_hostname(True), content)
+        '</html>' % (urlserver_settings['http_title'], css, urlserver_get_base_url(), content)
     urlserver_server_reply(conn, '200 OK', '', html)
 
 def urlserver_server_fd_cb(data, fd):
@@ -627,7 +621,7 @@ def urlserver_update_urllist(buffer_full_name, buffer_short_name, tags, prefix, 
                 if [key for key, value in urlserver['urls'].items() if value[3] == url]:
                     continue
             number = urlserver['number']
-            if not url.startswith(urlserver_get_hostname()): # don't save urls already shorten
+            if not url.startswith(urlserver_get_base_url()): # don't save urls already shorten
                 urlserver['urls'][number] = (datetime.datetime.now().strftime(urlserver_settings['http_time_format']), nick, buffer_short_name, url, '%s\t%s' % (prefix, message))
                 urls_short.append(urlserver_short_url(number))
                 if urlserver['buffer']:
